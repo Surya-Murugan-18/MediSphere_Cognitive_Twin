@@ -1,0 +1,199 @@
+# =============================================================================
+# MediSphere Cognitive Twin — Docker Compose
+# Phase 8 — B8.1
+#
+# Services:
+#   mongo     — MongoDB 7.0 (data persistence via named volume)
+#   kafka     — Apache Kafka 3.7 (KRaft mode — no Zookeeper)
+#   backend   — Spring Boot 3 / Java 21 (depends on mongo + kafka)
+#   frontend  — React/Vite served via Nginx (depends on backend)
+#
+# Quick start:
+#   docker compose up --build
+#
+# Frontend:  http://localhost:3000
+# Backend:   http://localhost:8080
+# Swagger:   http://localhost:8080/swagger-ui.html
+#
+# Development credentials (seeded by DataSeeder on first boot):
+#   Clinician:  a.mehta@medisphere.dev  / Medisphere@123
+#   Admin:      admin@medisphere.dev    / Admin@123
+#
+# Required: create a .env file at project root from .env.example
+#   cp .env.example .env
+#   (then set JWT_SECRET to a strong random value)
+# =============================================================================
+
+services:
+
+  # ── MongoDB 7.0 ────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: medisphere-mongo
+    restart: unless-stopped
+    environment:
+      # No-auth Mongo for development — access is restricted to the Docker network
+      MONGO_INITDB_DATABASE: medisphere
+    volumes:
+      # Named volume for data persistence across restarts
+      - mongo_data:/data/db
+      # Initialisation script: creates indexes on first boot
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      # Expose to host for local tooling (Compass, mongosh) — not required by services
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - medisphere-net
+
+  # ── Apache Kafka 3.7 (KRaft — no Zookeeper) ────────────────────────────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: medisphere-kafka
+    restart: unless-stopped
+    environment:
+      # KRaft configuration — no Zookeeper required
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Log retention — short for development
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_SEGMENT_BYTES: 104857600
+      # Auto-create topics on first producer/consumer contact
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      # Expose for host-side Kafka CLI tools if needed
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - medisphere-net
+
+  # ── Spring Boot Backend ────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medisphere-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      # MongoDB — connect via Docker service name
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: medisphere
+
+      # JWT — MUST be overridden in .env with a strong secret
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-900}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-2592000}
+
+      # Kafka — connect via Docker service name (KRaft, no Zookeeper)
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      # CORS — allow requests from the frontend Nginx container
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+
+      # Spring profile: dev enables DataSeeder + simulator
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+
+      # FHIR — mock mode (default, no external server required)
+      FHIR_MODE: ${FHIR_MODE:-mock}
+      FHIR_BASE_URL: ${FHIR_BASE_URL:-}
+      FHIR_CLIENT_ID: ${FHIR_CLIENT_ID:-}
+      FHIR_CLIENT_SECRET: ${FHIR_CLIENT_SECRET:-}
+
+      # AI — stub mode (deterministic, no external AI required)
+      AI_PREDICTION_MODE: ${AI_PREDICTION_MODE:-stub}
+      AI_CAREPLAN_MODE: ${AI_CAREPLAN_MODE:-stub}
+
+      # Federated learning — stub mode
+      FEDERATED_MODE: ${FEDERATED_MODE:-stub}
+
+      # Wearable simulator — enabled in dev profile
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
+      SIMULATOR_INTERVAL: ${SIMULATOR_INTERVAL:-5}
+
+      # Anomaly thresholds
+      ANOMALY_SPO2_LOW_THRESHOLD: ${ANOMALY_SPO2_LOW_THRESHOLD:-94.0}
+      ANOMALY_BP_SYSTOLIC_THRESHOLD: ${ANOMALY_BP_SYSTOLIC_THRESHOLD:-140}
+      ANOMALY_BP_DIASTOLIC_THRESHOLD: ${ANOMALY_BP_DIASTOLIC_THRESHOLD:-90}
+      ANOMALY_HR_HISTORY_WINDOW: ${ANOMALY_HR_HISTORY_WINDOW:-50}
+      ANOMALY_HR_MIN_SAMPLES: ${ANOMALY_HR_MIN_SAMPLES:-5}
+      WEARABLE_OFFLINE_THRESHOLD: ${WEARABLE_OFFLINE_THRESHOLD:-30}
+
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+    networks:
+      - medisphere-net
+
+  # ── React Frontend (Nginx) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # /api is proxied to backend:8080 by Nginx — no hardcoded host needed
+        VITE_API_BASE_URL: /api
+        # WebSocket connects through the same Nginx proxy
+        VITE_WS_BASE_URL: ""
+    container_name: medisphere-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - medisphere-net
+
+# ── Named Volumes ──────────────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+# ── Network ────────────────────────────────────────────────────────────────────
+networks:
+  medisphere-net:
+    driver: bridge

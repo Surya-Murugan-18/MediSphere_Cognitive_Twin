@@ -1,0 +1,70 @@
+# Test configuration — uses embedded MongoDB automatically via de.flapdoodle.embed.mongo
+spring:
+  data:
+    mongodb:
+      database: medisphere-test
+  # Kafka is provided by @EmbeddedKafka in tests that need it.
+  # For tests that do not use Kafka at all, set very short timeouts so
+  # the consumer/producer fail fast instead of spinning for minutes.
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    consumer:
+      group-id: medisphere-test
+      auto-offset-reset: earliest
+      properties:
+        session.timeout.ms: 5000
+        request.timeout.ms: 3000
+        default.api.timeout.ms: 3000
+        max.poll.interval.ms: 5000
+        connections.max.idle.ms: 5000
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        request.timeout.ms: 3000
+        delivery.timeout.ms: 5000
+        max.block.ms: 3000
+        connections.max.idle.ms: 5000
+    listener:
+      missing-topics-fatal: false
+
+# Required by de.flapdoodle.embed.mongo.spring3x — specify MongoDB version to download
+de:
+  flapdoodle:
+    mongodb:
+      embedded:
+        version: 7.0.4
+
+medisphere:
+  jwt:
+    secret: "test-only-jwt-secret-key-for-unit-tests-minimum-32-chars"
+    access-token-expiry-seconds: 900
+    refresh-token-expiry-seconds: 86400
+    issuer: medisphere
+  cors:
+    allowed-origins: http://localhost:5173
+  audit:
+    enabled: true
+  anomaly:
+    hr-spike-percentile: 95
+    hr-history-window: 50
+    hr-min-samples: 5
+    spo2-low-threshold: 94.0
+    bp-systolic-threshold: 140
+    bp-diastolic-threshold: 90
+  wearable:
+    offline-threshold-minutes: 30
+  simulator:
+    enabled: false   # always off in tests
+  ai:
+    prediction:
+      mode: stub
+    careplan:
+      mode: stub
+  federated:
+    mode: stub
+
+logging:
+  level:
+    com.medisphere: DEBUG
+    org.springframework.security: DEBUG
