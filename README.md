@@ -17,7 +17,7 @@ MongoDB 7.0                  Wearable Simulator
     │                         (dev profile only)
     ▼
 FHIR Layer (mock | live)
-AI Layer   (stub | tff)
+AI Layer   (configured | tff)
 ```
 
 **Core workflow:** Collect → Interoperate (FHIR) → Stream (Kafka) → Store (MongoDB) → Predict (AI) → Monitor → Alert → Prevent (Care Plans)
@@ -124,9 +124,9 @@ All variables are documented in `.env.example`. Key variables:
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | No |
 | `SPRING_PROFILES_ACTIVE` | `dev` | No |
 | `FHIR_MODE` | `mock` | No — `live` requires FHIR server credentials |
-| `AI_PREDICTION_MODE` | `stub` | No — `tff` requires TFF endpoint |
-| `AI_CAREPLAN_MODE` | `stub` | No |
-| `FEDERATED_MODE` | `stub` | No |
+| `AI_PREDICTION_MODE` | `tff` | No — `tff` requires TFF endpoint |
+| `AI_CAREPLAN_MODE` | `tff` | No |
+| `FEDERATED_MODE` | `tff` | No |
 | `SIMULATOR_ENABLED` | `true` | No — set `false` to disable wearable simulator |
 | `SIMULATOR_INTERVAL` | `5` | No — seconds between simulated vitals readings |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Managed by Docker Compose |
@@ -275,7 +275,7 @@ All topics are auto-created on startup:
 | JWT secret | Set in `.env` (never commit) | Set via secrets manager |
 | MongoDB | No auth (dev convenience) | Auth credentials via env vars |
 | FHIR | `mock` — no external server needed | `live` — requires FHIR_BASE_URL + credentials |
-| AI | `stub` — deterministic, no GPU | `tff` — requires TFF_ENDPOINT |
+| AI | `tff` — deterministic, no GPU | `tff` — requires TFF_ENDPOINT |
 | CORS | `http://localhost:3000` | Set `CORS_ALLOWED_ORIGINS` to production URL |
 
 ---
