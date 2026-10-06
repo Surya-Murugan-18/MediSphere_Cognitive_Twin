@@ -1,0 +1,110 @@
+{
+  "model_id": "Readmission-30D",
+  "version": "1.0.0",
+  "description": "30-day hospital readmission risk \u2014 UCI Diabetes 130-US Hospitals",
+  "target": "readmitted_binary (<30=1, else=0)",
+  "dataset": "diabetic_data.csv",
+  "dataset_sha256": "0689e7ec031237dc63031b938805c48377748761a3b26acab621567afa24df97",
+  "algorithm": "lr",
+  "imbalance_experiment": "class_weight",
+  "training_features": [
+    "gender",
+    "age_midpoint",
+    "number_diagnoses",
+    "diag_group_1",
+    "diag_group_2",
+    "diag_group_3",
+    "number_emergency",
+    "diabetesMed",
+    "change"
+  ],
+  "inference_features": [
+    "gender",
+    "age_midpoint",
+    "number_diagnoses",
+    "diag_group_1",
+    "diag_group_2",
+    "diag_group_3",
+    "number_emergency",
+    "diabetesMed",
+    "change"
+  ],
+  "features_removed_from_training": [
+    "encounter_id",
+    "patient_nbr",
+    "readmitted",
+    "discharge_disposition_id",
+    "time_in_hospital",
+    "weight",
+    "max_glu_serum",
+    "A1Cresult",
+    "payer_code",
+    "num_lab_procedures",
+    "num_procedures",
+    "num_medications",
+    "race",
+    "admission_type_id",
+    "admission_source_id",
+    "medical_specialty",
+    "number_inpatient",
+    "number_outpatient",
+    "22 individual medication columns (n_meds_up/down/steady)"
+  ],
+  "proxy_features": {
+    "diag_group_1/2/3": "Patient.conditions keyword \u2192 ICD chapter group",
+    "number_emergency": "Count of HIGH-severity Alert records in prior 365 days",
+    "diabetesMed": "Patient.conditions + CarePlan.recommendations[*].intervention keyword match",
+    "change": "CarePlan.updatedAt within past 30 days"
+  },
+  "prediction_threshold": 0.2,
+  "calibration_method": "isotonic",
+  "prediction_time_assumption": "early_hospitalization",
+  "evaluation": {
+    "val": {
+      "roc_auc": 0.601877,
+      "pr_auc": 0.165896,
+      "precision": 0.259615,
+      "recall": 0.058231,
+      "f1": 0.095126,
+      "brier": 0.099034,
+      "threshold": 0.2
+    },
+    "test": {
+      "roc_auc": 0.556447,
+      "pr_auc": 0.13603,
+      "precision": 0.189602,
+      "recall": 0.038224,
+      "f1": 0.063622,
+      "brier": 0.100428,
+      "threshold": 0.2
+    },
+    "test_confusion_matrix": {
+      "tn": 12415,
+      "fp": 265,
+      "fn": 1560,
+      "tp": 62
+    }
+  },
+  "n_train": 73554,
+  "n_val": 12258,
+  "n_test": 14302,
+  "class_distribution": {
+    "train_pos": 8344,
+    "train_neg": 65210
+  },
+  "patient_split": {
+    "method": "StratifiedGroupKFold",
+    "n_splits": 7,
+    "n_patients_total": 70439
+  },
+  "random_state": 42,
+  "python_version": "3.11.9",
+  "library_versions": {
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.2.0",
+    "shap": "0.51.0",
+    "imbalanced-learn": "0.14.2"
+  },
+  "created_at": "2026-10-06T04:25:24.263622Z",
+  "created_by": "training/train_readmission.py"
+}

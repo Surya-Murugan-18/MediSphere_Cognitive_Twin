@@ -1,0 +1,15 @@
+# Development profile — safe defaults for local development
+# All secrets here are FOR DEVELOPMENT ONLY and must never be used in production.
+medisphere:
+  jwt:
+    # Development-only secret — MUST be overridden in production via JWT_SECRET env var
+    secret: "dev-only-medisphere-jwt-secret-key-change-in-production-minimum-32-chars"
+  simulator:
+    # Explicitly enabled in dev — @Profile("dev") is the production guard.
+    # Set SIMULATOR_ENABLED=false to disable without changing profiles.
+    enabled: true
+    interval-seconds: 5
+
+logging:
+  level:
+    com.medisphere: DEBUG

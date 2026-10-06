@@ -1,0 +1,93 @@
+{
+  "model_id": "Diabetes-Risk",
+  "version": "1.0.0",
+  "description": "Binary diabetes risk/status classification \u2014 CDC BRFSS 2015",
+  "target": "Diabetes_binary",
+  "dataset": "diabetes_binary_health_indicators_BRFSS2015.csv",
+  "dataset_sha256": "19f367e3e3350768f0c144c5d73ee5b355f67a57eaaa86ca7bd8aec594d8b1d0",
+  "algorithm": "xgb",
+  "imbalance_experiment": "baseline",
+  "training_features": [
+    "Age",
+    "Sex",
+    "HighBP",
+    "HighChol",
+    "CholCheck",
+    "Stroke",
+    "HeartDiseaseorAttack",
+    "PhysHlth"
+  ],
+  "inference_features": [
+    "Age",
+    "Sex",
+    "HighBP",
+    "HighChol",
+    "CholCheck",
+    "Stroke",
+    "HeartDiseaseorAttack",
+    "PhysHlth"
+  ],
+  "features_removed_from_training": [
+    "BMI",
+    "GenHlth",
+    "Smoker",
+    "PhysActivity",
+    "Fruits",
+    "Veggies",
+    "HvyAlcoholConsump",
+    "NoDocbcCost",
+    "MentHlth",
+    "DiffWalk",
+    "Education",
+    "Income",
+    "AnyHealthcare"
+  ],
+  "proxy_features": {
+    "PhysHlth": "Count of HIGH/MEDIUM Alert records in past 30 days (capped at 30)"
+  },
+  "prediction_threshold": 0.2307,
+  "calibration_method": "isotonic",
+  "evaluation": {
+    "val": {
+      "roc_auc": 0.791106,
+      "pr_auc": 0.408733,
+      "precision": 0.342596,
+      "recall": 0.62766,
+      "f1": 0.443252,
+      "brier": 0.109936,
+      "threshold": 0.2307
+    },
+    "test": {
+      "roc_auc": 0.759183,
+      "pr_auc": 0.34141,
+      "precision": 0.316828,
+      "recall": 0.579677,
+      "f1": 0.409719,
+      "brier": 0.114823,
+      "threshold": 0.2307
+    },
+    "test_confusion_matrix": {
+      "tn": 22576,
+      "fp": 6581,
+      "fn": 2213,
+      "tp": 3052
+    }
+  },
+  "n_train": 160631,
+  "n_val": 34421,
+  "n_test": 34422,
+  "class_distribution": {
+    "train_pos": 24568,
+    "train_neg": 136063
+  },
+  "random_state": 42,
+  "python_version": "3.11.9",
+  "library_versions": {
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.2.0",
+    "shap": "0.51.0",
+    "imbalanced-learn": "0.14.2"
+  },
+  "created_at": "2026-10-06T04:24:25.797050Z",
+  "created_by": "training/train_diabetes.py"
+}
