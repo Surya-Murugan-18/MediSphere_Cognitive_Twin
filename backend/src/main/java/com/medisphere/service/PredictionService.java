@@ -3,6 +3,7 @@ package com.medisphere.service;
 import com.medisphere.ai.AIPredictionService;
 import com.medisphere.audit.AuditContext;
 import com.medisphere.audit.AuditService;
+import com.medisphere.domain.Alert;
 import com.medisphere.domain.LabResult;
 import com.medisphere.domain.Patient;
 import com.medisphere.domain.Prediction;
@@ -10,6 +11,7 @@ import com.medisphere.domain.VitalsSnapshot;
 import com.medisphere.dto.response.PageResponse;
 import com.medisphere.dto.response.PredictionResponse;
 import com.medisphere.exception.ResourceNotFoundException;
+import com.medisphere.repository.AlertRepository;
 import com.medisphere.repository.LabResultRepository;
 import com.medisphere.repository.PatientRepository;
 import com.medisphere.repository.PredictionRepository;
@@ -23,6 +25,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +55,7 @@ public class PredictionService {
     private final VitalsSnapshotRepository vitalsSnapshotRepository;
     private final TwinService twinService;
     private final AuditService auditService;
+    private final AlertRepository alertRepository;
 
     public PredictionService(AIPredictionService aiPredictionService,
                               PredictionRepository predictionRepository,
@@ -58,7 +63,8 @@ public class PredictionService {
                               LabResultRepository labResultRepository,
                               VitalsSnapshotRepository vitalsSnapshotRepository,
                               TwinService twinService,
-                              AuditService auditService) {
+                              AuditService auditService,
+                              AlertRepository alertRepository) {
         this.aiPredictionService = aiPredictionService;
         this.predictionRepository = predictionRepository;
         this.patientRepository = patientRepository;
@@ -66,6 +72,7 @@ public class PredictionService {
         this.vitalsSnapshotRepository = vitalsSnapshotRepository;
         this.twinService = twinService;
         this.auditService = auditService;
+        this.alertRepository = alertRepository;
     }
 
     // ── Run all 3 models for a patient (called async on patient create) ────
@@ -115,9 +122,10 @@ public class PredictionService {
                 log.error("DM prediction failed for patient {}: {}", patientId, e.getMessage());
             }
 
-            // 3. Readmission Risk (empty alert list — Phase 5 will supply real alerts)
+            // 3. Readmission Risk — real HIGH alerts from last 365 days
             try {
-                Prediction readmission = aiPredictionService.predictReadmission(patient, List.of());
+                List<String> highAlerts = loadHighAlertsLastYear(patientId);
+                Prediction readmission = aiPredictionService.predictReadmission(patient, highAlerts);
                 results.add(predictionRepository.save(readmission));
                 log.debug("Readmission prediction for {}: {}% ({})", patientId, readmission.getValue(), readmission.getCategory());
             } catch (Exception e) {
@@ -176,8 +184,9 @@ public class PredictionService {
                     aiPredictionService.predictDiabetesComplication(patient, labs)));
         }
         if (runAll || "Readmit-30d-v1.8".equals(model)) {
+            List<String> highAlerts = loadHighAlertsLastYear(patientId);
             results.add(predictionRepository.save(
-                    aiPredictionService.predictReadmission(patient, List.of())));
+                    aiPredictionService.predictReadmission(patient, highAlerts)));
         }
 
         if (!results.isEmpty()) {
@@ -310,6 +319,29 @@ public class PredictionService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
+
+    /**
+     * Load HIGH-severity alerts from the previous 365 days for a patient.
+     * Returns a list of alert IDs (used by TFFAIPredictionService for count).
+     * The AIPredictionService.predictReadmission() contract accepts List<String> (alert IDs).
+     */
+    private List<String> loadHighAlertsLastYear(String patientId) {
+        try {
+            Instant oneYearAgo = Instant.now().minus(365, ChronoUnit.DAYS);
+            long count = alertRepository.countByPatientIdAndSeverityAndDetectedAtAfter(
+                    patientId, "HIGH", oneYearAgo);
+            // Return a list of sentinel strings with the right size so predictReadmission
+            // receives the correct count. TFFAIPredictionService uses list.size() for the feature.
+            List<String> result = new ArrayList<>();
+            for (long i = 0; i < count; i++) {
+                result.add("HIGH-ALERT");
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("Could not load HIGH alerts for patient {}: {}", patientId, e.getMessage());
+            return List.of();
+        }
+    }
 
     /**
      * Update patient.riskLevel to the highest category from the new predictions.

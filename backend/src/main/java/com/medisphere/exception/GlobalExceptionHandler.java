@@ -1,5 +1,6 @@
 package com.medisphere.exception;
 
+import com.medisphere.ai.tff.MLServiceUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -162,6 +163,28 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
+                .body(body);
+    }
+
+    // ── 503 Service Unavailable — ML service down ────────────────────────────
+
+    @ExceptionHandler(MLServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleMlUnavailable(
+            MLServiceUnavailableException ex,
+            HttpServletRequest request) {
+
+        log.warn("ML service unavailable: {}", ex.getMessage());
+
+        ErrorResponse body = ErrorResponse.of(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "Service Unavailable",
+                "The ML prediction service is currently unavailable. Please try again later.",
+                requestId(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(body);
     }
 

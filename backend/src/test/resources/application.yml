@@ -61,6 +61,9 @@ medisphere:
       mode: stub
     careplan:
       mode: stub
+    ml:
+      service-url: http://localhost:19999    # non-existent — integration tests override this
+      internal-token: test-internal-token
   federated:
     mode: stub
 

@@ -54,10 +54,13 @@ medisphere:
     smart-client-secret: ${FHIR_CLIENT_SECRET:}
   ai:
     prediction:
-      mode: ${AI_PREDICTION_MODE:stub}        # stub | tff
+      mode: ${AI_PREDICTION_MODE:stub}        # stub | ml | tff
       tff-endpoint: ${TFF_ENDPOINT:}
     careplan:
       mode: ${AI_CAREPLAN_MODE:stub}          # stub | tff
+    ml:
+      service-url: ${ML_SERVICE_URL:http://localhost:8000}
+      internal-token: ${ML_INTERNAL_TOKEN:dev-token}
   federated:
     mode: ${FEDERATED_MODE:stub}              # stub | live
   cors:

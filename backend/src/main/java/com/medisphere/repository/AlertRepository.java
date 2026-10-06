@@ -31,4 +31,20 @@ public interface AlertRepository
             String patientId,
             List<String> statuses
     );
+
+    /**
+     * Count HIGH-severity alerts for a patient after a given point in time.
+     * Used by TFFAIPredictionService to compute number_high_alerts_prior_year
+     * for the Readmission-30D model.
+     *
+     * @param patientId the patient ID
+     * @param severity  the severity string (e.g. "HIGH")
+     * @param since     only include alerts detected after this instant
+     * @return count of matching alerts
+     */
+    long countByPatientIdAndSeverityAndDetectedAtAfter(
+            String patientId,
+            String severity,
+            java.time.Instant since
+    );
 }

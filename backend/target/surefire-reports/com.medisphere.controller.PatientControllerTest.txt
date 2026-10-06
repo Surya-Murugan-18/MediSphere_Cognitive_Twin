@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.medisphere.controller.PatientControllerTest
--------------------------------------------------------------------------------
-Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 13.69 s -- in com.medisphere.controller.PatientControllerTest

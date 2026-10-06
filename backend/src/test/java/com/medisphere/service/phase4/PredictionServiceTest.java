@@ -10,6 +10,7 @@ import com.medisphere.domain.VitalsSnapshot;
 import com.medisphere.dto.response.PageResponse;
 import com.medisphere.dto.response.PredictionResponse;
 import com.medisphere.exception.ResourceNotFoundException;
+import com.medisphere.repository.AlertRepository;
 import com.medisphere.repository.LabResultRepository;
 import com.medisphere.repository.PatientRepository;
 import com.medisphere.repository.PredictionRepository;
@@ -51,15 +52,19 @@ class PredictionServiceTest {
     @Mock private VitalsSnapshotRepository vitalsSnapshotRepository;
     @Mock private TwinService twinService;
     @Mock private AuditService auditService;
+    @Mock private AlertRepository alertRepository;
 
     private PredictionService predictionService;
 
     @BeforeEach
     void setUp() {
+        // Default: AlertRepository returns 0 HIGH alerts so existing tests are unaffected
+        lenient().when(alertRepository.countByPatientIdAndSeverityAndDetectedAtAfter(
+                any(), any(), any())).thenReturn(0L);
         predictionService = new PredictionService(
                 aiPredictionService, predictionRepository,
                 patientRepository, labResultRepository,
-                vitalsSnapshotRepository, twinService, auditService);
+                vitalsSnapshotRepository, twinService, auditService, alertRepository);
     }
 
     // ── runPredictionsSync ────────────────────────────────────────────────

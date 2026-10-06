@@ -91,6 +91,33 @@ services:
     networks:
       - medisphere-net
 
+  # ── FastAPI ML Inference Service ──────────────────────────────────────────
+  # Serves three trained risk models: CVD-10Y, Diabetes-Risk, Readmission-30D.
+  # Activated by setting AI_PREDICTION_MODE=ml in backend environment.
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: medisphere-ml-service
+    restart: unless-stopped
+    environment:
+      # Internal token — must match ML_INTERNAL_TOKEN passed to backend.
+      # MUST be overridden in .env with a strong random value in production.
+      # Generate with: openssl rand -hex 32
+      ML_INTERNAL_TOKEN: ${ML_INTERNAL_TOKEN:-dev-token}
+    ports:
+      # Expose for direct local health-check access from the host.
+      # The backend uses the internal Docker network (http://ml-service:8000).
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - medisphere-net
+
   # ── Spring Boot Backend ────────────────────────────────────────────────────
   backend:
     build:
@@ -102,6 +129,8 @@ services:
       mongo:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      ml-service:
         condition: service_healthy
     environment:
       # MongoDB — connect via Docker service name
@@ -128,9 +157,13 @@ services:
       FHIR_CLIENT_ID: ${FHIR_CLIENT_ID:-}
       FHIR_CLIENT_SECRET: ${FHIR_CLIENT_SECRET:-}
 
-      # AI — stub mode (deterministic, no external AI required)
+      # AI — set to ml to enable real FastAPI ML predictions
       AI_PREDICTION_MODE: ${AI_PREDICTION_MODE:-stub}
       AI_CAREPLAN_MODE: ${AI_CAREPLAN_MODE:-stub}
+
+      # ML Service — backend reaches ml-service via Docker internal network
+      ML_SERVICE_URL: http://ml-service:8000
+      ML_INTERNAL_TOKEN: ${ML_INTERNAL_TOKEN:-dev-token}
 
       # Federated learning — stub mode
       FEDERATED_MODE: ${FEDERATED_MODE:-stub}
